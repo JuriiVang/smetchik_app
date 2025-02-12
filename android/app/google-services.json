@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "352366066969",
+    "project_id": "smetchikapp",
+    "storage_bucket": "smetchikapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:352366066969:android:46a840c905fc3d6864d988",
+        "android_client_info": {
+          "package_name": "com.example.my_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBib09IxPflD4dr2z6fxTs-Rci7Y_AxTaY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class RoomInputScreen extends StatefulWidget {
+  final String projectId;
+  final String buildingId;
+  final String? roomId; // null, если создаём новую комнату
+
+  const RoomInputScreen(
+      {super.key,
+      required this.projectId,
+      required this.buildingId,
+      this.roomId});
+
+  @override
+  RoomInputScreenState createState() => RoomInputScreenState();
+}
+
+class RoomInputScreenState extends State<RoomInputScreen> {
+  final _formKey = GlobalKey<FormState>();
+  String roomName = "";
+  double width = 0.0;
+  double height = 0.0;
+  String roomType = "Обычная"; // Тип комнаты (например, "Кухня", "Офис")
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.roomId != null) {
+      _loadRoomData();
+    }
+  }
+
+  Future<void> _loadRoomData() async {
+    var roomDoc = await FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .collection('buildings')
+        .doc(widget.buildingId)
+        .collection('rooms')
+        .doc(widget.roomId)
+        .get();
+
+    if (roomDoc.exists) {
+      var data = roomDoc.data()!;
+      setState(() {
+        roomName = data['name'] ?? "";
+        width = (data['width'] ?? 0.0).toDouble();
+        height = (data['height'] ?? 0.0).toDouble();
+        roomType = data['roomType'] ?? "Обычная";
+      });
+    }
+  }
+
+  Future<void> _saveRoomData() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    var roomRef = FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .collection('buildings')
+        .doc(widget.buildingId)
+        .collection('rooms');
+
+    if (widget.roomId == null) {
+      await roomRef.add({
+        'name': roomName,
+        'width': width,
+        'height': height,
+        'roomType': roomType,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await roomRef.doc(widget.roomId).update({
+        'name': roomName,
+        'width': width,
+        'height': height,
+        'roomType': roomType,
+      });
+    }
+
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+          title: Text(widget.roomId == null
+              ? "Добавить комнату"
+              : "Редактировать комнату")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                initialValue: roomName,
+                decoration:
+                    const InputDecoration(labelText: "Название комнаты"),
+                onChanged: (value) => roomName = value,
+                validator: (value) =>
+                    value!.isEmpty ? "Введите название!" : null,
+              ),
+              TextFormField(
+                initialValue: width.toString(),
+                decoration: const InputDecoration(labelText: "Ширина (м)"),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => width = double.tryParse(value) ?? 0.0,
+              ),
+              TextFormField(
+                initialValue: height.toString(),
+                decoration: const InputDecoration(labelText: "Высота (м)"),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => height = double.tryParse(value) ?? 0.0,
+              ),
+              DropdownButtonFormField<String>(
+                value: roomType,
+                decoration: const InputDecoration(labelText: "Тип комнаты"),
+                items: ["Обычная", "Кухня", "Ванная", "Спальня", "Офис"]
+                    .map((type) =>
+                        DropdownMenuItem(value: type, child: Text(type)))
+                    .toList(),
+                onChanged: (value) => setState(() => roomType = value!),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _saveRoomData,
+                child: Text(widget.roomId == null
+                    ? "Добавить комнату"
+                    : "Сохранить изменения"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

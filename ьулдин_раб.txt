@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'room_input_screen.dart';
+
+class BuildingInputScreen extends StatefulWidget {
+  @override
+  _BuildingInputScreenState createState() => _BuildingInputScreenState();
+}
+
+class _BuildingInputScreenState extends State<BuildingInputScreen> {
+  final _formKey = GlobalKey<FormState>();
+  String buildingName = "";
+
+  Future<void> _saveBuilding() async {
+    try {
+      if (buildingName.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Введите название здания!"), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      DocumentReference buildingRef =
+          await FirebaseFirestore.instance.collection('buildings').add({
+        'name': buildingName,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("✅ Здание добавлено!"), backgroundColor: Colors.green),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RoomInputScreen(buildingId: buildingRef.id),
+        ),
+      );
+    } catch (e) {
+      print("❌ Ошибка: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Ошибка сохранения данных"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Добавить здание")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                decoration: InputDecoration(labelText: "Название здания"),
+                onChanged: (value) => buildingName = value,
+                validator: (value) => value!.isEmpty ? "Введите название" : null,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    _saveBuilding();
+                  }
+                },
+                child: Text("Сохранить здание"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
