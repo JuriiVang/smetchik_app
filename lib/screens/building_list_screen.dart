@@ -30,7 +30,7 @@ class BuildingListScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               var building = buildings[index];
               var buildingData =
-                  building.data() as Map<String, dynamic>?; // ✅ Исправлено
+              building.data() as Map<String, dynamic>?; // ✅ Исправлено
 
               // ✅ Добавляем защиту от отсутствующих данных
               String name = buildingData?['name'] ?? "Без названия";
@@ -40,14 +40,14 @@ class BuildingListScreen extends StatelessWidget {
                 title: Text(name),
                 subtitle: Text("Этажей: $floors"),
                 onTap: () {
-                  if (!context.mounted) {
-                    return; // ✅ Проверяем, что экран смонтирован
-                  }
+                  if (!context.mounted) return; // ✅ Проверяем, что экран активен
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => RoomListScreen(
-                          projectId: projectId, buildingId: building.id),
+                        projectId: projectId,
+                        buildingId: building.id,
+                      ),
                     ),
                   );
                 },
@@ -55,7 +55,6 @@ class BuildingListScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      // 📌 Кнопка редактирования здания
                       icon: const Icon(Icons.edit, color: Colors.blue),
                       onPressed: () {
                         if (!context.mounted) return;
@@ -63,13 +62,14 @@ class BuildingListScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => BuildingInputScreen(
-                                projectId: projectId, buildingId: building.id),
+                              projectId: projectId,
+                              buildingId: building.id,
+                            ),
                           ),
                         );
                       },
                     ),
                     IconButton(
-                      // 📌 Кнопка удаления здания
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () async {
                         try {
@@ -79,8 +79,9 @@ class BuildingListScreen extends StatelessWidget {
                               .collection('buildings')
                               .doc(building.id)
                               .delete();
+                          debugPrint("✅ Здание удалено: $name");
                         } catch (e) {
-                          debugPrint("Ошибка при удалении здания: $e");
+                          debugPrint("❌ Ошибка удаления здания: $e");
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -99,7 +100,6 @@ class BuildingListScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        // ➕ Добавить здание
         onPressed: () {
           if (!context.mounted) return;
           Navigator.push(

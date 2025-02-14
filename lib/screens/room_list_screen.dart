@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'room_input_screen.dart'; // Экран для добавления/редактирования комнат
+import 'room_input_screen.dart'; // ✅ Экран ввода комнаты
+import 'design_screen.dart'; // ✅ Экран проектирования
 
 class RoomListScreen extends StatelessWidget {
   final String projectId;
@@ -15,7 +16,7 @@ class RoomListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("📋 Список комнат")),
+      appBar: AppBar(title: const Text("Список комнат")),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('projects')
@@ -25,12 +26,8 @@ class RoomListScreen extends StatelessWidget {
             .collection('rooms')
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("❌ Нет комнат"));
           }
 
           var rooms = snapshot.data!.docs;
@@ -39,21 +36,20 @@ class RoomListScreen extends StatelessWidget {
             itemCount: rooms.length,
             itemBuilder: (context, index) {
               var room = rooms[index];
-              var roomData = room.data() as Map<String, dynamic>? ?? {};
+              var roomData = room.data() as Map<String, dynamic>?;
 
-              String roomName = roomData['name'] ?? 'Без названия';
-              double roomLength =
-                  (roomData['length'] ?? 0.0).toDouble(); // ✅ Защита от `null`
+              String name = roomData?['name'] ?? "Без названия";
 
               return ListTile(
-                title: Text(roomName),
-                subtitle: Text("Площадь: $roomLength м²"),
+                title: Text(name),
                 onTap: () {
-                  // 🔥 Открываем экран редактирования комнаты
+                  print("🟢 Открываем комнату: ${room.id}"); // ✅ Проверяем ID комнаты
+                  print("📌 Проект: $projectId, Здание: $buildingId, Комната: ${room.id}");
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => RoomInputScreen(
+                      builder: (context) => DesignScreen(
                         projectId: projectId,
                         buildingId: buildingId,
                         roomId: room.id,
@@ -61,25 +57,6 @@ class RoomListScreen extends StatelessWidget {
                     ),
                   );
                 },
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    await FirebaseFirestore.instance
-                        .collection('projects')
-                        .doc(projectId)
-                        .collection('buildings')
-                        .doc(buildingId)
-                        .collection('rooms')
-                        .doc(room.id)
-                        .delete();
-
-                    if (!context.mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("✅ Комната удалена")),
-                    );
-                  },
-                ),
               );
             },
           );
@@ -87,13 +64,13 @@ class RoomListScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // 🔥 Добавляем новую комнату
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => RoomInputScreen(
                 projectId: projectId,
                 buildingId: buildingId,
+                roomId: null,
               ),
             ),
           );

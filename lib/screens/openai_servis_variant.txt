@@ -1,0 +1,115 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../secrets.dart'; // 🔑 API-ключ OpenAI
+import 'package:flutter/material.dart';
+
+class OpenAIService {
+  static const String openAiUrl = "https://api.openai.com/v1/chat/completions";
+
+  /// 📌 **Анализ чертежа с помощью OpenAI Vision**
+  static Future<Map<String, dynamic>?> analyzeDrawing(File imageFile) async {
+    try {
+      debugPrint("📤 Отправляем изображение в OpenAI Vision...");
+
+      // 📌 Читаем изображение и кодируем в base64
+      String base64Image = base64Encode(await imageFile.readAsBytes());
+
+      // 📌 Формируем запрос
+      final response = await http.post(
+        Uri.parse(openAiUrl),
+        headers: {
+          "Authorization": "Bearer $openAiApiKey",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "model": "gpt-4-turbo",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Ты инженер, анализируешь чертежи и извлекаешь размеры."
+            },
+            {
+              "role": "user",
+              "content": [
+                {"type": "text", "text": "Определи размеры комнаты по чертежу."},
+                {
+                  "type": "image_url",
+                  "image_url": {"url": "data:image/png;base64,$base64Image"}
+                }
+              ]
+            }
+          ],
+          "max_tokens": 500
+        }),
+      );
+
+      // 📌 Обрабатываем ответ
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String extractedText = data["choices"][0]["message"]["content"];
+
+        debugPrint("✅ Извлеченные размеры: $extractedText");
+
+        // 📌 Преобразуем в Map
+        Map<String, dynamic> dimensions = _parseDimensions(extractedText);
+        return dimensions;
+      } else {
+        debugPrint("❌ Ошибка OpenAI: ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Ошибка при анализе изображения: $e");
+      return null;
+    }
+  }
+
+  /// 📌 **Сохраняем размеры в Firestore**
+  static Future<void> saveRoomDimensions(
+      String projectId, String buildingId, String roomId, Map<String, dynamic> dimensions) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('buildings')
+          .doc(buildingId)
+          .collection('rooms')
+          .doc(roomId)
+          .set({
+        'width': dimensions['width'],
+        'length': dimensions['length'],
+        'height': dimensions['height'],
+        'area': dimensions['area'],
+        'volume': dimensions['volume'],
+        'analyzedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint("✅ Данные успешно сохранены в Firestore");
+    } catch (e) {
+      debugPrint("❌ Ошибка сохранения в Firestore: $e");
+    }
+  }
+
+  /// 📌 **Парсим текст с размерами из OpenAI в Map**
+  static Map<String, dynamic> _parseDimensions(String text) {
+    final RegExp widthRegex = RegExp(r'Ширина[:=]?\s?([\d.]+)');
+    final RegExp lengthRegex = RegExp(r'Длина[:=]?\s?([\d.]+)');
+    final RegExp heightRegex = RegExp(r'Высота[:=]?\s?([\d.]+)');
+    final RegExp areaRegex = RegExp(r'Площадь[:=]?\s?([\d.]+)');
+    final RegExp volumeRegex = RegExp(r'Объем[:=]?\s?([\d.]+)');
+
+    double getValue(RegExp regex) {
+      final match = regex.firstMatch(text);
+      return match != null ? double.parse(match.group(1)!) : 0.0;
+    }
+
+    return {
+      'width': getValue(widthRegex),
+      'length': getValue(lengthRegex),
+      'height': getValue(heightRegex),
+      'area': getValue(areaRegex),
+      'volume': getValue(volumeRegex),
+    };
+  }
+}

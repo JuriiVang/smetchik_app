@@ -64,6 +64,7 @@ class _FeatureInputScreenState extends State<FeatureInputScreen> {
           .get();
 
       if (featureDoc.exists) {
+
         var data = featureDoc.data()!;
         setState(() {
           featureType = data['type'] ?? "Окно";

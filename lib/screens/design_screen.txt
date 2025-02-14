@@ -1,0 +1,146 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'secrets.dart'; // 🔑 Файл с API-ключом
+import 'firebase_service.dart'; // 📂 Читаем и сохраняем данные в Firebase
+import 'openai_assistant.dart'; // 🤖 OpenAI ассистент
+
+class DesignScreen extends StatefulWidget {
+  final String projectId;
+  final String buildingId;
+  final String roomId;
+
+  const DesignScreen({
+    super.key,
+    required this.projectId,
+    required this.buildingId,
+    required this.roomId,
+  });
+
+  @override
+  State<DesignScreen> createState() => _DesignScreenState();
+}
+
+class _DesignScreenState extends State<DesignScreen> {
+  String selectedStyle = "Современный";
+  String selectedBudget = "Стандарт";
+  String designDescription = "Нажмите 'Создать проект', чтобы получить описание";
+  String? imageBase64; // 🖼 Храним base64-изображение
+  bool isLoading = false; // ⏳ Индикатор загрузки
+
+  Future<void> _generateDesign() async {
+    setState(() {
+      isLoading = true;
+      designDescription = "🔄 Генерация проекта...";
+    });
+
+    debugPrint("📢 Загружаем данные помещения...");
+    Map<String, dynamic>? roomData = await FirebaseService.getRoomData(widget.projectId, widget.buildingId, widget.roomId);
+
+    if (roomData != null) {
+      debugPrint("✅ Данные получены: $roomData");
+
+      try {
+        // 🔹 Отправляем данные ассистенту
+        String result = await OpenAIRequest.askAssistant("ВАШ_ID", roomData);
+
+        // 🔹 Генерируем изображение
+        String base64Image = await generateImage(selectedStyle);
+
+        // 🔹 Сохраняем расчёты в Firebase
+        await FirebaseService.saveCalculation(widget.projectId, widget.buildingId, widget.roomId, result, base64Image);
+
+        // 🔹 Обновляем UI
+        setState(() {
+          designDescription = result;
+          imageBase64 = base64Image;
+        });
+      } catch (e) {
+        debugPrint("❌ Ошибка при расчёте: $e");
+        setState(() {
+          designDescription = "Ошибка при расчёте проекта.";
+        });
+      }
+    } else {
+      setState(() {
+        designDescription = "❌ Данные о помещении не найдены!";
+      });
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Проектирование")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text("Выберите стиль:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            DropdownButtonFormField<String>(
+              value: selectedStyle,
+              decoration: const InputDecoration(labelText: "Стиль"),
+              items: ["Современный", "Классика", "Минимализм", "Стандарт"]
+                  .map((style) => DropdownMenuItem(value: style, child: Text(style)))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedStyle = value!;
+                });
+              },
+            ),
+
+            const SizedBox(height: 10),
+
+            const Text("Выберите бюджет:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            DropdownButton<String>(
+              value: selectedBudget,
+              items: ["Эконом", "Стандарт", "Премиум"].map((String budget) {
+                return DropdownMenuItem(value: budget, child: Text(budget));
+              }).toList(),
+              onChanged: (String? value) {
+                setState(() {
+                  selectedBudget = value!;
+                });
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            ElevatedButton(
+              onPressed: _generateDesign,
+              child: isLoading ? const CircularProgressIndicator() : const Text("Создать проект"),
+            ),
+
+            const SizedBox(height: 20),
+
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  designDescription,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            if (imageBase64 != null && imageBase64!.isNotEmpty)
+              Image.memory(
+                base64Decode(imageBase64!),
+                fit: BoxFit.cover,
+                width: double.infinity,
+              )
+            else
+              const Text("Изображение недоступно"),
+          ],
+        ),
+      ),
+    );
+  }
+}
