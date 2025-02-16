@@ -1,0 +1,178 @@
+import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/openai_service.dart';
+import '../services/firebase_service.dart';
+import 'design_screen.dart';
+
+class RoomInputScreen extends StatefulWidget {
+  final String projectId;
+  final String buildingId;
+  final String? roomId;
+
+  const RoomInputScreen({
+    super.key,
+    required this.projectId,
+    required this.buildingId,
+    this.roomId,
+  });
+
+  @override
+  RoomInputScreenState createState() => RoomInputScreenState();
+}
+
+class RoomInputScreenState extends State<RoomInputScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  final TextEditingController roomNameController = TextEditingController();
+  final TextEditingController widthController = TextEditingController();
+  final TextEditingController lengthController = TextEditingController();
+  final TextEditingController heightController = TextEditingController();
+
+  final List<Map<String, TextEditingController>> additionalDimensions = [];
+  Uint8List? _imageData;
+  String? _imageUrl;
+  bool _isLoading = false;
+  String _assistantResponse = "Введите вопрос для ассистента.";
+  final TextEditingController _queryController = TextEditingController();
+
+  @override
+  void dispose() {
+    roomNameController.dispose();
+    widthController.dispose();
+    lengthController.dispose();
+    heightController.dispose();
+    _queryController.dispose();
+    for (var dim in additionalDimensions) {
+      dim["label"]!.dispose();
+      dim["values"]!.dispose();
+    }
+    super.dispose();
+  }
+
+  void _showAssistantDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("🛠 Помощник проектирования"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _queryController,
+              decoration: const InputDecoration(hintText: "Введите ваш запрос"),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () async {
+                setState(() {
+                  _assistantResponse = "⏳ Обрабатываю запрос...";
+                });
+                String response = await OpenAIService.analyzeRoom("roomId_placeholder", {"message": _queryController.text});
+                setState(() {
+                  _assistantResponse = response;
+                });
+              },
+              child: const Text("🔍 Запросить"),
+            ),
+            const SizedBox(height: 10),
+            Text(_assistantResponse),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Закрыть"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveRoomData() async {
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Подтверждение"),
+          content: const Text("Вы уверены, что хотите сохранить данные?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Отмена"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Сохранить"),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirm != true) return;
+
+    if (!_formKey.currentState!.validate()) return;
+
+    String roomId = widget.roomId ?? roomNameController.text.toLowerCase().replaceAll(" ", "_");
+
+    List<Map<String, dynamic>> dimensionsArray = [];
+    for (var dim in additionalDimensions) {
+      List<double> valuesList = dim["values"]!.text
+          .split(",")
+          .map((e) => double.tryParse(e.trim()) ?? 0.0)
+          .where((num) => num > 0)
+          .toList();
+      dimensionsArray.add({
+        "label": dim["label"]!.text,
+        "values": valuesList,
+      });
+    }
+
+    await FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .collection('buildings')
+        .doc(widget.buildingId)
+        .collection('rooms')
+        .doc(roomId)
+        .set({
+      'name': roomNameController.text,
+      'width': double.tryParse(widthController.text.replaceAll(",", ".")) ?? 0.0,
+      'length': double.tryParse(lengthController.text.replaceAll(",", ".")) ?? 0.0,
+      'height': double.tryParse(heightController.text.replaceAll(",", ".")) ?? 0.0,
+      'additional_dimensions': dimensionsArray,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Комната сохранена!')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Ввод размеров")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(controller: roomNameController, decoration: const InputDecoration(labelText: "Название")),
+                TextFormField(controller: widthController, decoration: const InputDecoration(labelText: "Ширина (м)"), keyboardType: TextInputType.number),
+                TextFormField(controller: lengthController, decoration: const InputDecoration(labelText: "Длина (м)"), keyboardType: TextInputType.number),
+                TextFormField(controller: heightController, decoration: const InputDecoration(labelText: "Высота (м)"), keyboardType: TextInputType.number),
+                const SizedBox(height: 20),
+                ElevatedButton(onPressed: () => _showAssistantDialog(context), child: const Text("🤖 Вызвать ассистента")),
+                const SizedBox(height: 20),
+                ElevatedButton(onPressed: _saveRoomData, child: const Text("Сохранить")),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

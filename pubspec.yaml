@@ -17,6 +17,8 @@ dependencies:
   http: ^1.3.0
   flutter_markdown: ^0.6.17
   flutter_image: ^4.0.0  # 📌 Добавляем поддержку загрузки изображений
+  firebase_storage: ^12.4.2
+  image_picker_web: ^4.0.0
 
 dev_dependencies:
   flutter_test:

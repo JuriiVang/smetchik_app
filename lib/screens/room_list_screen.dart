@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../services/openai_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'room_input_screen.dart'; // ✅ Экран ввода комнаты
-import 'design_screen.dart'; // ✅ Экран проектирования
+import 'room_input_screen.dart';
+import 'design_screen.dart';
+import 'test_dialog_screen.dart';  // ✅ Добавляем импорт
+import '../secrets.dart'; // ✅ Добавляем импорт
+
 
 class RoomListScreen extends StatelessWidget {
   final String projectId;
@@ -31,21 +35,22 @@ class RoomListScreen extends StatelessWidget {
           }
 
           var rooms = snapshot.data!.docs;
+          print("🚀 Загруженные комнаты: ${rooms.length}");
 
           return ListView.builder(
             itemCount: rooms.length,
+
             itemBuilder: (context, index) {
+
               var room = rooms[index];
               var roomData = room.data() as Map<String, dynamic>?;
+              print("🛠 Обрабатываем комнату: ${room.id}");
 
               String name = roomData?['name'] ?? "Без названия";
 
               return ListTile(
                 title: Text(name),
                 onTap: () {
-                  print("🟢 Открываем комнату: ${room.id}"); // ✅ Проверяем ID комнаты
-                  print("📌 Проект: $projectId, Здание: $buildingId, Комната: ${room.id}");
-
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -64,13 +69,18 @@ class RoomListScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          print("📌 Открываем RoomInputScreen");
+          print("➡ projectId: $projectId");
+          print("➡ buildingId: $buildingId");
+          print("➡ roomId: null (создаём новую комнату)");
+
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => RoomInputScreen(
                 projectId: projectId,
                 buildingId: buildingId,
-                roomId: null,
+                roomId: null, // ✅ Для новой комнаты roomId должен быть null
               ),
             ),
           );

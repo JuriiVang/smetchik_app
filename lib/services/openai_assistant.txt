@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../secrets.dart'; // API-ключ OpenAI
+//import '../secrets.dart'; // API-ключ OpenAI
 
 class OpenAIAssistant {
   // 📌 Анализ чертежа через OpenAI Vision

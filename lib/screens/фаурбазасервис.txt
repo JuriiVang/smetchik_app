@@ -1,0 +1,54 @@
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart'; // Для kIsWeb
+
+class FirebaseService {
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  // 📌 Сохранение размеров комнаты в Firestore
+  static Future<void> saveRoomDimensions(
+      String projectId, String buildingId, String roomId, Map<String, dynamic> dimensions) async {
+    try {
+      await _firestore
+          .collection('projects')
+          .doc(projectId)
+          .collection('buildings')
+          .doc(buildingId)
+          .collection('rooms')
+          .doc(roomId)
+          .update({
+        "dimensions": dimensions,
+        "updatedAt": FieldValue.serverTimestamp(),
+      });
+
+      debugPrint("✅ Размеры сохранены в Firestore!");
+    } catch (e) {
+      debugPrint("❌ Ошибка сохранения данных: $e");
+    }
+  }
+
+  // 📌 Загрузка изображения в Firebase Storage
+  static Future<String?> uploadImage(Uint8List imageData, String projectId, String roomId) async {
+    try {
+      final ref = _storage.ref().child('room_images/$projectId/$roomId.png');
+      await ref.putData(imageData);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint("❌ Ошибка загрузки изображения: $e");
+      return null;
+    }
+  }
+
+  // 📌 Получение URL изображения комнаты
+  static Future<String?> getImageUrl(String projectId, String roomId) async {
+    try {
+      final ref = _storage.ref().child('room_images/$projectId/$roomId.png');
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint("❌ Ошибка загрузки URL изображения: $e");
+      return null;
+    }
+  }
+}
